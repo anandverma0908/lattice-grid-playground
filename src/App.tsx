@@ -30,7 +30,7 @@ import {
 } from "@lattice-grid-lib/core";
 import { generateInventoryData, type InventoryRow } from "./data/inventory";
 import { INVENTORY_COLUMNS } from "./data/columns";
-import { Docs } from "./components/Docs";
+import { Docs, LatticeGridLogo } from "./components/Docs";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  STABLE DATA
@@ -1097,9 +1097,9 @@ function Demo5FullGrid({
 const PRESETS: Array<{ key: ThemePreset; dot: string }> = [
   { key: "light", dot: "#2563eb" },
   { key: "dark", dot: "#3b82f6" },
-  { key: "ocean", dot: "#0e9eff" },
-  { key: "forest", dot: "#4ade80" },
-  { key: "sunset", dot: "#fb923c" },
+  // { key: "ocean", dot: "#0e9eff" },
+  // { key: "forest", dot: "#4ade80" },
+  // { key: "sunset", dot: "#fb923c" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1107,7 +1107,7 @@ const PRESETS: Array<{ key: ThemePreset; dot: string }> = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [view, setView] = useState<"demo" | "docs">("demo");
+  const [view, setView] = useState<"demo" | "docs">("docs");
   const [activePreset, setActivePreset] = useState<ThemePreset>("light");
   const [tokenOverrides, setTokenOverrides] = useState<GridTokens>({});
 
@@ -1152,7 +1152,7 @@ export default function App() {
         }}
       >
         {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {/* <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div
             style={{
               width: 26,
@@ -1220,10 +1220,37 @@ export default function App() {
           >
             v2.1
           </span>
+        </div> */}
+
+        {/* Brand */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            // padding: "14px 16px 12px",
+            // borderBottom: `1px solid ${bdr}`,
+            flexShrink: 0,
+          }}
+        >
+          <LatticeGridLogo size={30} />
+          <div>
+            <div
+              style={{
+                fontSize: 14.5,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                // color: txt,
+              }}
+            >
+              LatticeGrid
+            </div>
+            <div style={{ fontSize: 10 }}>v1.0 · React data grid</div>
+          </div>
         </div>
 
         {/* View tabs */}
-        <div style={{ display: "flex", gap: 2, marginLeft: 12 }}>
+        {/* <div style={{ display: "flex", gap: 2, marginLeft: 12 }}>
           {(["demo", "docs"] as const).map((v) => (
             <button
               key={v}
@@ -1244,7 +1271,7 @@ export default function App() {
               {v === "demo" ? "Demos" : "Docs"}
             </button>
           ))}
-        </div>
+        </div> */}
 
         <div style={{ flex: 1 }} />
 
