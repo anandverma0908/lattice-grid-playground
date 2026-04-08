@@ -33,7 +33,7 @@ const BASE_COLUMNS: ColumnDef<InventoryRow>[] = [
     sortable: false,
     resizable: false,
     draggable: false,
-    renderCell: (_v, row) => (
+    renderCell: (_v: unknown, row: InventoryRow) => (
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
         <span
           style={{
@@ -146,6 +146,7 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
         sortable: true,
         resizable: true,
         draggable: true,
+        hideable: true,
         align: 'left' as const,
       }));
     }, [leafColumns]),
@@ -321,9 +322,6 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
         height={440}
         rowHeight={36}
         headerHeight={38}
-        showToolbar={false}
-        showFooter={false}
-        alternateRows
         style={{ borderRadius: 0, borderTop: 'none', borderBottom: 'none' }}
         onRowClick={(row) => selection.toggleRow(row.id)}
       />
