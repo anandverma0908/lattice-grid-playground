@@ -1,5 +1,5 @@
 // =============================================================================
-//  LatticeGrid — Documentation  (MUI / TanStack-style)
+//  LatticeGrid — Documentation
 //  Three-pane layout: Left nav + Main content + Right ToC
 // =============================================================================
 
@@ -19,6 +19,7 @@ import {
   type SortState,
   type ColumnState,
   type ColumnManagerRenderProps,
+  type ResolvedColumn,
   useColumnFilter,
   useGridPagination,
   useGridExport,
@@ -300,6 +301,7 @@ const NAV_GROUPS = [
     { id: 'server-sort', label: 'Server-Side Sort' },
     { id: 'filtering',   label: 'Filtering' },
     { id: 'row-select',  label: 'Row Selection' },
+    { id: 'keyboard',    label: 'Keyboard Interaction' },
     { id: 'pagination',  label: 'Pagination' },
     { id: 'export',      label: 'Export' },
   ]},
@@ -411,6 +413,8 @@ export function Docs({ isDark }: { isDark: boolean }) {
   const [serverData, setServerData]       = useState<InventoryRow[]>(() => DATA200.slice(0, 50));
   const [persistLog, setPersistLog]       = useState('');
   const [activeTheme, setActiveTheme]     = useState<ThemePreset>('light');
+  const [keyboardRows, setKeyboardRows]   = useState<InventoryRow[]>(() => DATA200.slice(0, 80));
+  const [keyboardLog, setKeyboardLog]     = useState('Focus a cell in the live grid, then try the shortcuts below.');
   const engineRef = useRef<GridEngine<InventoryRow> | null>(null);
 
   const handleServerSort = useCallback((sort: SortState) => {
@@ -436,6 +440,45 @@ export function Docs({ isDark }: { isDark: boolean }) {
   const handlePersist = useCallback((state: ColumnState[]) => {
     setPersistLog(`${state.filter(c => c.hidden).length} hidden · ${state.filter(c => c.pinned).length} pinned · ${state.length} total`);
   }, []);
+
+  const makeKeyboardRow = useCallback((id: number): InventoryRow => ({
+    ...(DATA200[0] ?? {}),
+    id,
+    product: 'Keyboard-created product',
+    dc: 'Keyboard Lab',
+    channel: 1,
+    status: 'active',
+    stock: 0,
+    sold: 0,
+    q1: 0,
+    q2: 0,
+    q3: 0,
+  } as InventoryRow), []);
+
+  const handleKeyboardEdit = useCallback((
+    row: InventoryRow,
+    _rowIndex: number,
+    column: ResolvedColumn<InventoryRow>,
+    value: string,
+  ) => {
+    const key = column.field ?? column.id;
+    setKeyboardRows(prev => prev.map(item => item.id === row.id ? { ...item, [key]: value } : item));
+    setKeyboardLog('Edited ' + column.label + ' on row ' + row.id + ': ' + value);
+  }, []);
+
+  const handleKeyboardDelete = useCallback((rows: InventoryRow[]) => {
+    const ids = new Set(rows.map(row => row.id));
+    setKeyboardRows(prev => prev.filter(row => !ids.has(row.id)));
+    setKeyboardLog('Deleted ' + rows.length + ' selected row' + (rows.length === 1 ? '' : 's') + ' with Delete.');
+  }, []);
+
+  const handleKeyboardInsert = useCallback(() => {
+    setKeyboardRows(prev => {
+      const nextId = Math.max(0, ...prev.map(row => row.id)) + 1;
+      return [makeKeyboardRow(nextId), ...prev];
+    });
+    setKeyboardLog('Inserted a new row at the top with Insert.');
+  }, [makeKeyboardRow]);
 
   const colMgrSlot = useCallback(({ engine }: ColumnManagerRenderProps<InventoryRow>) => { engineRef.current = engine; return null; }, []);
   const colMgrToolbar = useCallback((engine: GridEngine<InventoryRow>) => {
@@ -981,6 +1024,102 @@ sel.clearSelection()`}</Code>
                   onRowClick={(row) => sel.toggleRow((row as InventoryRow).id)} />
               </div>
             </div>
+          </Section>
+
+          {/* ════════════ KEYBOARD INTERACTION ════════════ */}
+          <Section
+            id="keyboard"
+            title="Keyboard Interactivity"
+            subtitle="WCAG-friendly ARIA grid navigation, selection, editing, row operations, and column shortcuts using a roving tabindex focus model."
+            badge={{ text: 'ARIA Grid', color: '#7c3aed' }}
+          >
+            <Callout type="tip">
+              Click any cell in the live grid, then use the keyboard. Tab and Shift+Tab intentionally leave the grid unless you are committing an edit, so focus is never trapped.
+            </Callout>
+
+            <LiveGrid
+              height={300}
+              theme={gTheme as ThemePreset}
+              columns={SIMPLE_COLS}
+              data={keyboardRows}
+              label={keyboardLog}
+              features={{ toolbar: true, footer: false, rowSelection: true }}
+              onCellEdit={handleKeyboardEdit}
+              onRowsDelete={handleKeyboardDelete}
+              onRowInsert={handleKeyboardInsert}
+            />
+
+            <SubSection title="Navigation">
+              <PropsTable>
+                <PropRow prop="Arrow keys" type="Up / Down / Left / Right" def="-" desc="Move active cell focus one row or column while preserving grid boundaries and scrolling virtualized rows into view." />
+                <PropRow prop="Home / End" type="key" def="-" desc="Move to the first or last cell in the current row." />
+                <PropRow prop="Ctrl/Cmd + Home / End" type="shortcut" def="-" desc="Move to the first or last cell in the entire grid." />
+                <PropRow prop="Page Up / Page Down" type="key" def="-" desc="Move by one visible viewport of rows and keep the newly focused row visible." />
+                <PropRow prop="Tab / Shift+Tab" type="browser focus" def="not trapped" desc="Leaves the grid and moves to the next or previous focusable element on the page." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Selection">
+              <PropsTable>
+                <PropRow prop="Space" type="key" def="-" desc="Selects the current row, matching mouse row selection." />
+                <PropRow prop="Ctrl/Cmd + Space" type="shortcut" def="-" desc="Toggles the current row without clearing other selected rows." />
+                <PropRow prop="Shift + Arrow keys" type="shortcut" def="-" desc="Extends the selected row range from the selection anchor to the focused row." />
+                <PropRow prop="Ctrl/Cmd + A" type="shortcut" def="-" desc="Selects all currently rendered data rows in the grid model." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Editing & Row Operations">
+              <PropsTable>
+                <PropRow prop="Enter" type="key" def="-" desc="Starts editing the current editable cell; while editing, Enter commits the value." />
+                <PropRow prop="F2" type="key" def="-" desc="Toggles into edit mode, matching common spreadsheet behavior." />
+                <PropRow prop="Escape" type="key" def="-" desc="Cancels editing and restores the previous value." />
+                <PropRow prop="Tab while editing" type="key" def="-" desc="Commits the edit and moves to the next editable cell; Shift+Tab moves to the previous editable cell." />
+                <PropRow prop="Delete" type="key" def="callback" desc="Confirms deletion and calls onRowsDelete with the selected rows and row indexes." />
+                <PropRow prop="Insert" type="key" def="callback" desc="Calls onRowInsert so the parent application can create a new row." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Column Shortcuts">
+              <PropsTable>
+                <PropRow prop="Alt + Arrow Left / Right" type="shortcut" def="10px step" desc="Resizes the active column left or right using the same resize engine as pointer resizing." />
+                <PropRow prop="Ctrl/Cmd + Shift + Arrow Left / Right" type="shortcut" def="-" desc="Reorders the active column left or right using the same order state as drag reorder." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Implementation">
+              <Code>{`<LatticeGrid
+  columns={columns}
+  data={rows}
+  getRowId={row => row.id}
+  features={{ rowSelection: true }}
+  onCellEdit={(row, rowIndex, column, value) => {
+    setRows(prev => prev.map(item =>
+      item.id === row.id
+        ? { ...item, [column.field ?? column.id]: value }
+        : item
+    ));
+  }}
+  onRowsDelete={(selectedRows, rowIndexes) => {
+    const ids = new Set(selectedRows.map(row => row.id));
+    setRows(prev => prev.filter(row => !ids.has(row.id)));
+  }}
+  onRowInsert={() => {
+    setRows(prev => [createEmptyRow(), ...prev]);
+  }}
+/>`}</Code>
+              <PropsTable>
+                <PropRow prop="editable" type="boolean" def="true" desc="Column-level flag. Set editable: false for read-only cells such as IDs, action columns, or calculated values." />
+                <PropRow prop="onCellEdit" type="(row, index, column, value) => void" def="-" desc="Called after a keyboard edit is committed. The grid remains controlled; update your data source here." />
+                <PropRow prop="onRowsDelete" type="(rows, indexes) => void" def="-" desc="Called after Delete and confirmation. The parent decides how to remove rows." />
+                <PropRow prop="onRowInsert" type="() => void" def="-" desc="Called when Insert is pressed. The parent decides the inserted row shape and position." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Accessibility Contract">
+              <p style={{ fontSize: 13, color: dim, lineHeight: 1.7 }}>
+                The grid uses <code>role="grid"</code>, <code>role="row"</code>, <code>role="columnheader"</code>, and <code>role="gridcell"</code>. Cells expose <code>aria-colindex</code>, rows expose <code>aria-rowindex</code>, and selected rows/cells expose <code>aria-selected</code>. Only one cell is tabbable at a time through roving <code>tabIndex</code>, and live-region announcements report selection and editing state changes.
+              </p>
+            </SubSection>
           </Section>
 
           {/* ════════════ PAGINATION ════════════ */}
