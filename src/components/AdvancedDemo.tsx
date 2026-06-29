@@ -19,6 +19,18 @@ import {
 import { generateInventoryData, type InventoryRow } from '../data/inventory';
 
 const ALL_DATA = generateInventoryData(2000);
+const KEYBOARD_INSERT_TEMPLATE: InventoryRow = {
+  id: -1,
+  product: 'Keyboard-created product',
+  sku: 'KB-NEW',
+  dc: 'Keyboard Lab',
+  region: 'West',
+  channel: 1,
+  status: 'active',
+  stock: 0,
+  sold: 0,
+};
+for (let i = 1; i <= 296; i++) KEYBOARD_INSERT_TEMPLATE[`d${i}`] = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  COLUMNS (flat — no groups — cleaner for this demo)
@@ -33,7 +45,7 @@ const BASE_COLUMNS: ColumnDef<InventoryRow>[] = [
     sortable: false,
     resizable: false,
     draggable: false,
-    renderCell: (_v, row) => (
+    renderCell: (_v: unknown, row: InventoryRow) => (
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
         <span
           style={{
@@ -48,7 +60,7 @@ const BASE_COLUMNS: ColumnDef<InventoryRow>[] = [
   } as unknown as ColumnDef<InventoryRow>,
   { id: 'product', label: 'Product',  field: 'product', width: 220, pinned: 'left', sortable: true },
   { id: 'sku',     label: 'SKU',      field: 'sku',     width: 110, sortable: true },
-  { id: 'dc',      label: 'DC / SCC', field: 'dc',      width: 120, sortable: true },
+  { id: 'dc',      label: 'DC / SCC', field: 'dc',      width: 120, sortable: true, rowGroupIndex: 1 },
   { id: 'region',  label: 'Region',   field: 'region',  width: 90,  sortable: true },
   {
     id: 'channel',
@@ -57,6 +69,7 @@ const BASE_COLUMNS: ColumnDef<InventoryRow>[] = [
     width: 58,
     sortable: true,
     align: 'center',
+    rowGroupIndex: 0,
     renderCell: (v) => (
       <span style={{ fontWeight: 700, fontSize: 11, color: 'var(--vg-accent)' }}>CH{v as number}</span>
     ),
@@ -67,6 +80,7 @@ const BASE_COLUMNS: ColumnDef<InventoryRow>[] = [
     field: 'status',
     width: 90,
     sortable: true,
+    rowGroupIndex: 2,
     renderCell: (v) => {
       const map: Record<string, [string, string]> = {
         active: ['var(--vg-accent-bg)', 'var(--vg-accent-text)'],
@@ -109,9 +123,13 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
     [],
   );
 
+  const [rows, setRows] = useState<InventoryRow[]>(ALL_DATA);
+  const [groupByOverride, setGroupByOverride] = useState<string[] | undefined>(undefined);
+  const [keyboardLog, setKeyboardLog] = useState('Focus a cell, then try arrows, Space, Enter/F2, Delete, Insert, Alt+Arrow, or Cmd/Ctrl+Shift+Arrow.');
+
   // ── Column filter ──────────────────────────────────────────────────────────
   const filter = useColumnFilter<InventoryRow>({
-    data: ALL_DATA,
+    data: rows,
     columns: leafColumns,
   });
 
@@ -126,6 +144,22 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
     data: pagination.pageData,
     getRowId: (r) => r.id,
   });
+
+  const handleRowsDelete = (selectedRows: InventoryRow[]) => {
+    const ids = new Set(selectedRows.map((row) => row.id));
+    setRows((prev) => prev.filter((row) => !ids.has(row.id)));
+    selection.clearSelection();
+    setKeyboardLog(`Deleted ${selectedRows.length} row(s) with Delete.`);
+  };
+
+  const handleRowInsert = () => {
+    setRows((prev) => {
+      const nextId = Math.max(0, ...prev.map((row) => row.id)) + 1;
+      return [{ ...KEYBOARD_INSERT_TEMPLATE, id: nextId, sku: `KB-${nextId}` }, ...prev];
+    });
+    pagination.goToPage(1);
+    setKeyboardLog('Inserted a new row with Insert.');
+  };
 
   // ── Export (only visible page, only non-selection columns) ────────────────
   const exporter = useGridExport<InventoryRow>({
@@ -146,6 +180,9 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
         sortable: true,
         resizable: true,
         draggable: true,
+        hideable: true,
+        rowGroup: false,
+        rowGroupIndex: null,
         align: 'left' as const,
       }));
     }, [leafColumns]),
@@ -186,6 +223,23 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
   }, [selection]);
 
   const [activeFilter, setActiveFilter] = useState<'product' | 'dc' | null>(null);
+
+  const groupingChoices: Array<{ label: string; value: string[] | undefined }> = [
+    { label: 'Column config default', value: undefined },
+    { label: 'Status → DC', value: ['status', 'dc'] },
+    { label: 'Channel → Status', value: ['channel', 'status'] },
+    { label: 'No grouping', value: [] },
+  ];
+
+  const setGrouping = (nextGroupBy: string[] | undefined) => {
+    setGroupByOverride(nextGroupBy);
+    const activeGroupBy = nextGroupBy ?? ['channel', 'dc', 'status'];
+    setKeyboardLog(
+      activeGroupBy.length
+        ? `Grouped by ${activeGroupBy.join(' → ')}. Click group rows to expand or collapse.`
+        : 'Grouping cleared. Rendering the flat page data.',
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -256,6 +310,50 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
           </button>
         )}
 
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: textDim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+            Group
+          </span>
+          {groupingChoices.map((choice) => {
+            const active = JSON.stringify(choice.value) === JSON.stringify(groupByOverride);
+            return (
+              <button
+                key={choice.label}
+                onClick={() => setGrouping(choice.value)}
+                style={{
+                  padding: '5px 9px',
+                  borderRadius: 5,
+                  border: `1px solid ${active ? 'var(--vg-accent, #2563eb)' : cardBdr}`,
+                  background: active ? (isDark ? '#1e3558' : '#dbeafe') : (isDark ? '#1c2438' : '#f3f4f6'),
+                  color: active ? (isDark ? '#93c5fd' : '#1d4ed8') : text,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {choice.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          aria-live="polite"
+          style={{
+            fontSize: 12,
+            color: textDim,
+            minWidth: 280,
+            maxWidth: 520,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+          title={keyboardLog}
+        >
+          {keyboardLog}
+        </div>
+
         <div style={{ flex: 1 }} />
 
         {/* Selection info */}
@@ -317,15 +415,16 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
         columns={columns}
         data={pagination.pageData}
         getRowId={(r) => r.id}
+        groupBy={groupByOverride}
+        onGroupingChange={setGroupByOverride}
         theme={theme}
         height={440}
         rowHeight={36}
         headerHeight={38}
-        showToolbar={false}
-        showFooter={false}
-        alternateRows
         style={{ borderRadius: 0, borderTop: 'none', borderBottom: 'none' }}
         onRowClick={(row) => selection.toggleRow(row.id)}
+        onRowsDelete={handleRowsDelete}
+        onRowInsert={handleRowInsert}
       />
 
       {/* ── Pagination ────────────────────────────────────────────────────── */}

@@ -1,5 +1,5 @@
 // =============================================================================
-//  LatticeGrid — Documentation  (MUI / TanStack-style)
+//  LatticeGrid — Documentation
 //  Three-pane layout: Left nav + Main content + Right ToC
 // =============================================================================
 
@@ -275,6 +275,14 @@ const SIMPLE_COLS: ColumnDef<InventoryRow>[] = [
   { id: 'q3',      label: 'Q3',      field: 'q3',      width: 70,  sortable: true, align: 'right' },
 ];
 
+const ROW_GROUP_COLS: ColumnDef<InventoryRow>[] = SIMPLE_COLS.map((col) => {
+  if ('children' in col) return col;
+  if (col.id === 'channel') return { ...col, rowGroupIndex: 0 };
+  if (col.id === 'dc') return { ...col, rowGroupIndex: 1 };
+  if (col.id === 'status') return { ...col, rowGroupIndex: 2 };
+  return col;
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  NAV STRUCTURE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -299,7 +307,9 @@ const NAV_GROUPS = [
     { id: 'sorting',     label: 'Client Sorting' },
     { id: 'server-sort', label: 'Server-Side Sort' },
     { id: 'filtering',   label: 'Filtering' },
+    { id: 'row-grouping', label: 'Row Grouping' },
     { id: 'row-select',  label: 'Row Selection' },
+    { id: 'keyboard',    label: 'Keyboard Interaction' },
     { id: 'pagination',  label: 'Pagination' },
     { id: 'export',      label: 'Export' },
   ]},
@@ -411,6 +421,8 @@ export function Docs({ isDark }: { isDark: boolean }) {
   const [serverData, setServerData]       = useState<InventoryRow[]>(() => DATA200.slice(0, 50));
   const [persistLog, setPersistLog]       = useState('');
   const [activeTheme, setActiveTheme]     = useState<ThemePreset>('light');
+  const [keyboardRows, setKeyboardRows]   = useState<InventoryRow[]>(() => DATA200.slice(0, 80));
+  const [keyboardLog, setKeyboardLog]     = useState('Focus a cell in the live grid, then try the shortcuts below.');
   const engineRef = useRef<GridEngine<InventoryRow> | null>(null);
 
   const handleServerSort = useCallback((sort: SortState) => {
@@ -436,6 +448,80 @@ export function Docs({ isDark }: { isDark: boolean }) {
   const handlePersist = useCallback((state: ColumnState[]) => {
     setPersistLog(`${state.filter(c => c.hidden).length} hidden · ${state.filter(c => c.pinned).length} pinned · ${state.length} total`);
   }, []);
+
+  const makeKeyboardRow = useCallback((id: number): InventoryRow => ({
+    ...(DATA200[0] ?? {}),
+    id,
+    product: 'Keyboard-created product',
+    dc: 'Keyboard Lab',
+    channel: 1,
+    status: 'active',
+    stock: 0,
+    sold: 0,
+    q1: 0,
+    q2: 0,
+    q3: 0,
+  } as InventoryRow), []);
+
+  const handleKeyboardValueChange = useCallback((
+    row: InventoryRow,
+    key: keyof InventoryRow,
+    label: string,
+    value: string,
+  ) => {
+    setKeyboardRows(prev => prev.map(item => item.id === row.id ? { ...item, [key]: value } : item));
+    setKeyboardLog('Updated ' + label + ' on row ' + row.id + ': ' + value);
+  }, []);
+
+  const handleKeyboardDelete = useCallback((rows: InventoryRow[]) => {
+    const ids = new Set(rows.map(row => row.id));
+    setKeyboardRows(prev => prev.filter(row => !ids.has(row.id)));
+    setKeyboardLog('Deleted ' + rows.length + ' selected row' + (rows.length === 1 ? '' : 's') + ' with Delete.');
+  }, []);
+
+  const handleKeyboardInsert = useCallback(() => {
+    setKeyboardRows(prev => {
+      const nextId = Math.max(0, ...prev.map(row => row.id)) + 1;
+      return [makeKeyboardRow(nextId), ...prev];
+    });
+    setKeyboardLog('Inserted a new row at the top with Insert.');
+  }, [makeKeyboardRow]);
+
+  const keyboardColumns = useMemo((): ColumnDef<InventoryRow>[] =>
+    SIMPLE_COLS.map(col => {
+      if (col.id === 'product') {
+        return {
+          ...col,
+          renderCell: (value, row) => (
+            <input
+              aria-label={'Edit product ' + row.id}
+              value={String(value ?? '')}
+              onChange={event => handleKeyboardValueChange(row, 'product', 'Product', event.target.value)}
+              style={{ width: '100%', border: '1px solid var(--vg-border)', borderRadius: 4, padding: '3px 6px', font: 'inherit', background: 'var(--vg-bg-input)', color: 'var(--vg-text)' }}
+            />
+          ),
+        };
+      }
+      if (col.id === 'status') {
+        return {
+          ...col,
+          renderCell: (value, row) => (
+            <select
+              aria-label={'Edit status ' + row.id}
+              value={String(value ?? 'active')}
+              onChange={event => handleKeyboardValueChange(row, 'status', 'Status', event.target.value)}
+              style={{ width: '100%', border: '1px solid var(--vg-border)', borderRadius: 4, padding: '3px 6px', font: 'inherit', background: 'var(--vg-bg-input)', color: 'var(--vg-text)' }}
+            >
+              <option value="active">Active</option>
+              <option value="low">Low</option>
+              <option value="out">Out</option>
+            </select>
+          ),
+        };
+      }
+      return col;
+    }),
+  [handleKeyboardValueChange]);
 
   const colMgrSlot = useCallback(({ engine }: ColumnManagerRenderProps<InventoryRow>) => { engineRef.current = engine; return null; }, []);
   const colMgrToolbar = useCallback((engine: GridEngine<InventoryRow>) => {
@@ -603,7 +689,7 @@ export function Docs({ isDark }: { isDark: boolean }) {
               customisation API. Handles millions of cells without breaking a sweat.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 28 }}>
-              {['Row virtualisation','Column virtualisation','Column groups','Column pinning','Column resize','Drag reorder','Show / hide','Auto-freeze','Row selection','Client & server sort','Custom cell renderers','Custom header renderers','Theme tokens','Feature flags','Custom icons','CSS class names','Style overrides','Slots','Persistence API','Headless engine','Zero dependencies'].map(f => <FeaturePill key={f} label={f} />)}
+              {['Row virtualisation','Column virtualisation','Column groups','Row grouping','Column pinning','Column resize','Drag reorder','Show / hide','Auto-freeze','Row selection','Client & server sort','Custom cell renderers','Custom header renderers','Theme tokens','Feature flags','Custom icons','CSS class names','Style overrides','Slots','Persistence API','Headless engine','Zero dependencies'].map(f => <FeaturePill key={f} label={f} />)}
             </div>
             <LiveGrid height={260} theme={gTheme as ThemePreset} label="Live demo — 200 rows · all features enabled" features={{ toolbar: true, footer: true, rowSelection: true }} freezeColId="dc" />
           </section>
@@ -665,6 +751,10 @@ const columns: ColumnDef<MyRow>[] = [
     sortable:  true,  resizable: true,
     draggable: true,  hideable:  true,
 
+    rowGroup: true,        // include this column in row grouping
+    rowGroupIndex: 0,      // grouping order; lower number = outer level
+    rowGroupValueGetter: row => row.product.toLowerCase(),
+
     renderCell:   (value, row) => <strong>{value}</strong>,
     renderHeader: (col, engine) => <span>{col.label} ✦</span>,
 
@@ -687,6 +777,9 @@ const columns: ColumnDef<MyRow>[] = [
               <PropRow prop="resizable"    type="boolean"                   def="true"     desc="Show resize handle." />
               <PropRow prop="draggable"    type="boolean"                   def="true"     desc="Allow drag-to-reorder." />
               <PropRow prop="hideable"     type="boolean"                   def="true"     desc="Show × hide button on hover." />
+              <PropRow prop="rowGroup"     type="boolean"                   def="false"    desc="Include this column in row grouping when the grid does not receive an explicit groupBy prop." />
+              <PropRow prop="rowGroupIndex" type="number"                   def="—"        desc="Grouping order. Supplying an index also enables row grouping for this column." />
+              <PropRow prop="rowGroupValueGetter" type="(row) => unknown"   def="—"        desc="Custom grouping key getter used only for row grouping." />
               <PropRow prop="renderCell"   type="(value, row) => ReactNode" def="—"        desc="Custom cell renderer." />
               <PropRow prop="renderHeader" type="(col, engine) => ReactNode" def="—"       desc="Custom header renderer." />
               <PropRow prop="cellStyle"    type="CSSProperties"             def="—"        desc="Inline style for every data cell." />
@@ -946,6 +1039,74 @@ useColumnFilter({ data, columns,
             </PropsTable>
           </Section>
 
+          {/* ════════════ ROW GROUPING ════════════ */}
+          <Section id="row-grouping" title="Row Grouping" subtitle="Use AG Grid-style column config for the easy path, or pass groupBy when you need controlled app state. Each grouping level renders an expandable group row.">
+            <Code>{`const columns = [
+  { id: 'product', label: 'Product', field: 'product', width: 220 },
+
+  // Easy path: declare grouping on the columns.
+  // rowGroupIndex controls nesting order.
+  { id: 'channel', label: 'Channel', field: 'channel', rowGroupIndex: 0 },
+  { id: 'dc',      label: 'DC',      field: 'dc',      rowGroupIndex: 1 },
+  { id: 'status',  label: 'Status',  field: 'status',  rowGroupIndex: 2 },
+];
+
+function GroupedInventoryGrid() {
+  return (
+    <LatticeGrid
+      columns={columns}
+      data={rows}
+      getRowId={row => row.id}
+    />
+  );
+}`}</Code>
+            <Code>{`function ControlledGroupingGrid() {
+  const [groupBy, setGroupBy] = useState<string[] | undefined>(undefined);
+
+  return (
+    <>
+      <button onClick={() => setGroupBy(['channel', 'dc', 'status'])}>
+        Channel → DC → Status
+      </button>
+      <button onClick={() => setGroupBy(['status', 'dc'])}>
+        Status → DC
+      </button>
+      <button onClick={() => setGroupBy([])}>
+        Clear grouping
+      </button>
+
+      <LatticeGrid
+        columns={columns}
+        data={rows}
+        groupBy={groupBy}              // undefined = use column rowGroup config
+        onGroupingChange={setGroupBy}
+        getRowId={row => row.id}
+      />
+    </>
+  );
+}`}</Code>
+            <LiveGrid
+              height={300}
+              theme={gTheme as ThemePreset}
+              columns={ROW_GROUP_COLS}
+              features={{ toolbar: true, footer: true, rowSelection: true }}
+              label="Column config default: Channel → DC → Status"
+            />
+            <Callout type="info">Filtering should be applied before the grouped data reaches the grid. Sorting still applies to the leaf rows first, then the grouped row model is built from that sorted/filtered result.</Callout>
+            <PropsTable>
+              <PropRow prop="column.rowGroup" type="boolean" def="false" desc="Include the column in row grouping when groupBy is not explicitly passed." />
+              <PropRow prop="column.rowGroupIndex" type="number" def="—" desc="Grouping order. Supplying an index also enables row grouping for that column." />
+              <PropRow prop="column.rowGroupValueGetter" type="(row) => unknown" def="—" desc="Custom grouping key used only for grouping." />
+              <PropRow prop="groupBy" type="string[]" def="column config" desc="Ordered column ids used to build group levels. Pass [] to explicitly disable column-config grouping." />
+              <PropRow prop="onGroupingChange" type="(groupBy) => void" def="—" desc="Called when grouping columns change through the grid engine." />
+              <PropRow prop="engine.setGroupingColumns" type="(ids) => void" def="—" desc="Set grouping columns from a custom toolbar or slot." />
+              <PropRow prop="engine.toggleGroup" type="(groupId) => void" def="—" desc="Expand or collapse one group row by its stable group id." />
+              <PropRow prop="engine.expandAllGroups" type="(ids) => void" def="—" desc="Mark a list of group ids as expanded." />
+              <PropRow prop="engine.collapseAllGroups" type="() => void" def="—" desc="Collapse every group row." />
+              <PropRow prop="engine.clearGrouping" type="() => void" def="—" desc="Remove all row grouping and return to the flat row model." />
+            </PropsTable>
+          </Section>
+
           {/* ════════════ ROW SELECTION ════════════ */}
           <Section id="row-select" title="Row Selection" subtitle="Click any row to select it. The same highlight spans every cell including pinned columns. useRowSelection adds multi-select with shift+click range support.">
             <Code>{`import { useRowSelection } from '@lattice-grid-lib/core';
@@ -981,6 +1142,99 @@ sel.clearSelection()`}</Code>
                   onRowClick={(row) => sel.toggleRow((row as InventoryRow).id)} />
               </div>
             </div>
+          </Section>
+
+          {/* ════════════ KEYBOARD INTERACTION ════════════ */}
+          <Section
+            id="keyboard"
+            title="Keyboard Interactivity"
+            subtitle="WCAG-friendly ARIA grid navigation, selection, custom cell activation, row operations, and column shortcuts using a roving tabindex focus model."
+            badge={{ text: 'ARIA Grid', color: '#7c3aed' }}
+          >
+            <Callout type="tip">
+              Click any cell in the live grid, then use the keyboard. Tab and Shift+Tab intentionally leave the grid, so focus is never trapped. Enter or F2 activates controls that your renderCell output already provides.
+            </Callout>
+
+            <LiveGrid
+              height={300}
+              theme={gTheme as ThemePreset}
+              columns={keyboardColumns}
+              data={keyboardRows}
+              label={keyboardLog}
+              features={{ toolbar: true, footer: false, rowSelection: true }}
+              onRowsDelete={handleKeyboardDelete}
+              onRowInsert={handleKeyboardInsert}
+            />
+
+            <SubSection title="Navigation">
+              <PropsTable>
+                <PropRow prop="Arrow keys" type="Up / Down / Left / Right" def="-" desc="Move active cell focus one row or column while preserving grid boundaries and scrolling virtualized rows into view." />
+                <PropRow prop="Home / End" type="key" def="-" desc="Move to the first or last cell in the current row." />
+                <PropRow prop="Ctrl/Cmd + Home / End" type="shortcut" def="-" desc="Move to the first or last cell in the entire grid." />
+                <PropRow prop="Page Up / Page Down" type="key" def="-" desc="Move by one visible viewport of rows and keep the newly focused row visible." />
+                <PropRow prop="Tab / Shift+Tab" type="browser focus" def="not trapped" desc="Leaves the grid and moves to the next or previous focusable element on the page." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Selection">
+              <PropsTable>
+                <PropRow prop="Space" type="key" def="-" desc="Selects the current row, matching mouse row selection." />
+                <PropRow prop="Ctrl/Cmd + Space" type="shortcut" def="-" desc="Toggles the current row without clearing other selected rows." />
+                <PropRow prop="Shift + Arrow keys" type="shortcut" def="-" desc="Extends the selected row range from the selection anchor to the focused row." />
+                <PropRow prop="Ctrl/Cmd + A" type="shortcut" def="-" desc="Selects all currently rendered data rows in the grid model." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Cell Activation & Row Operations">
+              <PropsTable>
+                <PropRow prop="Enter" type="key" def="-" desc="Activates the first focusable control rendered inside the current cell, such as an input, select, button, link, or contenteditable element." />
+                <PropRow prop="F2" type="key" def="-" desc="Activates the current cell's rendered control without the grid creating an editor." />
+                <PropRow prop="Delete" type="key" def="callback" desc="Confirms deletion and calls onRowsDelete with the selected rows and row indexes." />
+                <PropRow prop="Insert" type="key" def="callback" desc="Calls onRowInsert so the parent application can create a new row." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Column Shortcuts">
+              <PropsTable>
+                <PropRow prop="Alt + Arrow Left / Right" type="shortcut" def="10px step" desc="Resizes the active column left or right using the same resize engine as pointer resizing." />
+                <PropRow prop="Ctrl/Cmd + Shift + Arrow Left / Right" type="shortcut" def="-" desc="Reorders the active column left or right using the same order state as drag reorder." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Implementation">
+              <Code>{`<LatticeGrid
+  columns={[
+    { id: 'product', label: 'Product', field: 'product', renderCell: (value, row) => (
+      <input
+        value={String(value ?? '')}
+        onChange={event => updateRow(row.id, { product: event.target.value })}
+      />
+    )},
+    ...columns
+  ]}
+  data={rows}
+  getRowId={row => row.id}
+  features={{ rowSelection: true }}
+  onRowsDelete={(selectedRows, rowIndexes) => {
+    const ids = new Set(selectedRows.map(row => row.id));
+    setRows(prev => prev.filter(row => !ids.has(row.id)));
+  }}
+  onRowInsert={() => {
+    setRows(prev => [createEmptyRow(), ...prev]);
+  }}
+/>`}</Code>
+              <PropsTable>
+                <PropRow prop="renderCell" type="(value, row) => ReactNode" def="-" desc="Render your own input, select, button, link, or contenteditable control when a cell should be interactive. The grid does not create editors internally." />
+                <PropRow prop="onRowsDelete" type="(rows, indexes) => void" def="-" desc="Called after Delete and confirmation. The parent decides how to remove rows." />
+                <PropRow prop="onRowInsert" type="() => void" def="-" desc="Called when Insert is pressed. The parent decides the inserted row shape and position." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Accessibility Contract">
+              <p style={{ fontSize: 13, color: dim, lineHeight: 1.7 }}>
+                The grid uses <code>role="grid"</code>, <code>role="row"</code>, <code>role="columnheader"</code>, and <code>role="gridcell"</code>. Cells expose <code>aria-colindex</code>, rows expose <code>aria-rowindex</code>, and selected rows/cells expose <code>aria-selected</code>. Only one cell is tabbable at a time through roving <code>tabIndex</code>, and live-region announcements report selection and row-operation state changes.
+              </p>
+            </SubSection>
           </Section>
 
           {/* ════════════ PAGINATION ════════════ */}
@@ -1390,8 +1644,10 @@ function MyCustomGrid({ columns, data }) {
               <PropRow prop="freezeColId"         type="string"                   def="—"         desc="Column id to auto-freeze when scrolled behind pinned-left band." />
               <PropRow prop="loading"             type="boolean"                  def="false"     desc="Show loading overlay." />
               <PropRow prop="sortMode"            type="'client'|'server'"        def="'client'"  desc="'server' disables internal sort. Data rendered as-is." />
+              <PropRow prop="groupBy"             type="string[]"                 def="[]"        desc="Ordered column ids for hierarchical row grouping." />
               <PropRow prop="onRowClick"          type="(row,index)=>void"        def="—"         desc="Called when a row is clicked." />
               <PropRow prop="onSortChange"        type="(sort)=>void"             def="—"         desc="Called when sort state changes." />
+              <PropRow prop="onGroupingChange"    type="(groupBy)=>void"          def="—"         desc="Called when row grouping columns change." />
               <PropRow prop="onColumnResize"      type="(id,width)=>void"         def="—"         desc="Called when a column finishes resizing." />
               <PropRow prop="onColumnReorder"     type="(order)=>void"            def="—"         desc="Called when columns are drag-reordered." />
               <PropRow prop="onColumnStateChange" type="(state)=>void"            def="—"         desc="Called on any column layout change. Use for persistence." />
