@@ -1644,7 +1644,7 @@ function MyCustomGrid({ columns, data }) {
               <PropRow prop="freezeColId"         type="string"                   def="—"         desc="Column id to auto-freeze when scrolled behind pinned-left band." />
               <PropRow prop="loading"             type="boolean"                  def="false"     desc="Show loading overlay." />
               <PropRow prop="sortMode"            type="'client'|'server'"        def="'client'"  desc="'server' disables internal sort. Data rendered as-is." />
-              <PropRow prop="groupBy"             type="string[]"                 def="[]"        desc="Ordered column ids for hierarchical row grouping." />
+              <PropRow prop="groupBy"             type="string[]"                 def="column config" desc="Ordered column ids for hierarchical row grouping. Pass [] to explicitly disable rowGroup column config." />
               <PropRow prop="onRowClick"          type="(row,index)=>void"        def="—"         desc="Called when a row is clicked." />
               <PropRow prop="onSortChange"        type="(sort)=>void"             def="—"         desc="Called when sort state changes." />
               <PropRow prop="onGroupingChange"    type="(groupBy)=>void"          def="—"         desc="Called when row grouping columns change." />
