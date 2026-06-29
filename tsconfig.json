@@ -16,18 +16,9 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@lattice-grid-lib/core": [
-        "../lattice-grid/src/index.ts"
-      ]
-    }
+    "baseUrl": "."
   },
   "include": [
-    "src",
-    "../lattice-grid/src"
-  ],
-  "exclude": [
-    "../lattice-grid/src/__tests__"
+    "src"
   ]
 }
