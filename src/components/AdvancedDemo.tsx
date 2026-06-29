@@ -15,7 +15,6 @@ import {
   type ColumnDef,
   type LeafColumnDef,
   type ThemePreset,
-  type ResolvedColumn,
 } from '@lattice-grid-lib/core';
 import { generateInventoryData, type InventoryRow } from '../data/inventory';
 
@@ -61,7 +60,7 @@ const BASE_COLUMNS: ColumnDef<InventoryRow>[] = [
   } as unknown as ColumnDef<InventoryRow>,
   { id: 'product', label: 'Product',  field: 'product', width: 220, pinned: 'left', sortable: true },
   { id: 'sku',     label: 'SKU',      field: 'sku',     width: 110, sortable: true },
-  { id: 'dc',      label: 'DC / SCC', field: 'dc',      width: 120, sortable: true },
+  { id: 'dc',      label: 'DC / SCC', field: 'dc',      width: 120, sortable: true, rowGroupIndex: 1 },
   { id: 'region',  label: 'Region',   field: 'region',  width: 90,  sortable: true },
   {
     id: 'channel',
@@ -70,6 +69,7 @@ const BASE_COLUMNS: ColumnDef<InventoryRow>[] = [
     width: 58,
     sortable: true,
     align: 'center',
+    rowGroupIndex: 0,
     renderCell: (v) => (
       <span style={{ fontWeight: 700, fontSize: 11, color: 'var(--vg-accent)' }}>CH{v as number}</span>
     ),
@@ -80,6 +80,7 @@ const BASE_COLUMNS: ColumnDef<InventoryRow>[] = [
     field: 'status',
     width: 90,
     sortable: true,
+    rowGroupIndex: 2,
     renderCell: (v) => {
       const map: Record<string, [string, string]> = {
         active: ['var(--vg-accent-bg)', 'var(--vg-accent-text)'],
@@ -123,6 +124,7 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
   );
 
   const [rows, setRows] = useState<InventoryRow[]>(ALL_DATA);
+  const [groupByOverride, setGroupByOverride] = useState<string[] | undefined>(undefined);
   const [keyboardLog, setKeyboardLog] = useState('Focus a cell, then try arrows, Space, Enter/F2, Delete, Insert, Alt+Arrow, or Cmd/Ctrl+Shift+Arrow.');
 
   // ── Column filter ──────────────────────────────────────────────────────────
@@ -142,20 +144,6 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
     data: pagination.pageData,
     getRowId: (r) => r.id,
   });
-
-  const handleCellEdit = (
-    row: InventoryRow,
-    _rowIndex: number,
-    column: ResolvedColumn<InventoryRow>,
-    value: string,
-  ) => {
-    setRows((prev) =>
-      prev.map((item) =>
-        item.id === row.id ? { ...item, [column.field ?? column.id]: value } : item,
-      ),
-    );
-    setKeyboardLog(`Edited ${column.label} on row ${row.id}: ${value}`);
-  };
 
   const handleRowsDelete = (selectedRows: InventoryRow[]) => {
     const ids = new Set(selectedRows.map((row) => row.id));
@@ -193,7 +181,8 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
         resizable: true,
         draggable: true,
         hideable: true,
-        editable: true,
+        rowGroup: false,
+        rowGroupIndex: null,
         align: 'left' as const,
       }));
     }, [leafColumns]),
@@ -234,6 +223,23 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
   }, [selection]);
 
   const [activeFilter, setActiveFilter] = useState<'product' | 'dc' | null>(null);
+
+  const groupingChoices: Array<{ label: string; value: string[] | undefined }> = [
+    { label: 'Column config default', value: undefined },
+    { label: 'Status → DC', value: ['status', 'dc'] },
+    { label: 'Channel → Status', value: ['channel', 'status'] },
+    { label: 'No grouping', value: [] },
+  ];
+
+  const setGrouping = (nextGroupBy: string[] | undefined) => {
+    setGroupByOverride(nextGroupBy);
+    const activeGroupBy = nextGroupBy ?? ['channel', 'dc', 'status'];
+    setKeyboardLog(
+      activeGroupBy.length
+        ? `Grouped by ${activeGroupBy.join(' → ')}. Click group rows to expand or collapse.`
+        : 'Grouping cleared. Rendering the flat page data.',
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -303,6 +309,34 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
             ✕ Clear filters ({filter.filteredData.length.toLocaleString()} rows)
           </button>
         )}
+
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: textDim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+            Group
+          </span>
+          {groupingChoices.map((choice) => {
+            const active = JSON.stringify(choice.value) === JSON.stringify(groupByOverride);
+            return (
+              <button
+                key={choice.label}
+                onClick={() => setGrouping(choice.value)}
+                style={{
+                  padding: '5px 9px',
+                  borderRadius: 5,
+                  border: `1px solid ${active ? 'var(--vg-accent, #2563eb)' : cardBdr}`,
+                  background: active ? (isDark ? '#1e3558' : '#dbeafe') : (isDark ? '#1c2438' : '#f3f4f6'),
+                  color: active ? (isDark ? '#93c5fd' : '#1d4ed8') : text,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {choice.label}
+              </button>
+            );
+          })}
+        </div>
 
         <div
           aria-live="polite"
@@ -381,13 +415,14 @@ export function AdvancedDemo({ theme }: { theme: ThemePreset }) {
         columns={columns}
         data={pagination.pageData}
         getRowId={(r) => r.id}
+        groupBy={groupByOverride}
+        onGroupingChange={setGroupByOverride}
         theme={theme}
         height={440}
         rowHeight={36}
         headerHeight={38}
         style={{ borderRadius: 0, borderTop: 'none', borderBottom: 'none' }}
         onRowClick={(row) => selection.toggleRow(row.id)}
-        onCellEdit={handleCellEdit}
         onRowsDelete={handleRowsDelete}
         onRowInsert={handleRowInsert}
       />
