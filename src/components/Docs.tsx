@@ -422,7 +422,7 @@ export function Docs({ isDark }: { isDark: boolean }) {
   const [persistLog, setPersistLog]       = useState('');
   const [activeTheme, setActiveTheme]     = useState<ThemePreset>('light');
   const [keyboardRows, setKeyboardRows]   = useState<InventoryRow[]>(() => DATA200.slice(0, 80));
-  const [keyboardLog, setKeyboardLog]     = useState('Focus a cell in the live grid, then try the shortcuts below.');
+  const [keyboardLog, setKeyboardLog]     = useState('Click a cell, then try ArrowUp to reach the header. Header arrows, Enter sort, PageUp/PageDown, Space, Delete, and Insert are wired.');
   const engineRef = useRef<GridEngine<InventoryRow> | null>(null);
 
   const handleServerSort = useCallback((sort: SortState) => {
@@ -1148,11 +1148,11 @@ sel.clearSelection()`}</Code>
           <Section
             id="keyboard"
             title="Keyboard Interactivity"
-            subtitle="WCAG-friendly ARIA grid navigation, selection, custom cell activation, row operations, and column shortcuts using a roving tabindex focus model."
+            subtitle="WCAG-friendly AG Grid-style navigation for data cells, column headers, group rows, selection, custom cell activation, row operations, and column shortcuts using a roving tabindex focus model."
             badge={{ text: 'ARIA Grid', color: '#7c3aed' }}
           >
             <Callout type="tip">
-              Click any cell in the live grid, then use the keyboard. Tab and Shift+Tab intentionally leave the grid, so focus is never trapped. Enter or F2 activates controls that your renderCell output already provides.
+              Click any cell in the live grid, then use the keyboard. ArrowUp from row 1 moves into the column header; ArrowDown returns to row 1. Tab and Shift+Tab intentionally leave the grid, so focus is never trapped. Enter or F2 activates controls that your renderCell output already provides.
             </Callout>
 
             <LiveGrid
@@ -1166,13 +1166,38 @@ sel.clearSelection()`}</Code>
               onRowInsert={handleKeyboardInsert}
             />
 
+            <LiveGrid
+              height={260}
+              theme={gTheme as ThemePreset}
+              columns={ROW_GROUP_COLS}
+              data={keyboardRows}
+              label="Grouped keyboard lab — focus a group row and press Enter, ArrowRight, or ArrowLeft"
+              features={{ toolbar: true, footer: false, rowSelection: true }}
+              onRowsDelete={handleKeyboardDelete}
+              onRowInsert={handleKeyboardInsert}
+            />
+
             <SubSection title="Navigation">
               <PropsTable>
                 <PropRow prop="Arrow keys" type="Up / Down / Left / Right" def="-" desc="Move active cell focus one row or column while preserving grid boundaries and scrolling virtualized rows into view." />
+                <PropRow prop="ArrowUp from row 1" type="key" def="-" desc="Moves from the first data row into the matching column header." />
+                <PropRow prop="ArrowDown from header" type="key" def="-" desc="Moves from a column header back to the first data row in that column." />
                 <PropRow prop="Home / End" type="key" def="-" desc="Move to the first or last cell in the current row." />
                 <PropRow prop="Ctrl/Cmd + Home / End" type="shortcut" def="-" desc="Move to the first or last cell in the entire grid." />
                 <PropRow prop="Page Up / Page Down" type="key" def="-" desc="Move by one visible viewport of rows and keep the newly focused row visible." />
                 <PropRow prop="Tab / Shift+Tab" type="browser focus" def="not trapped" desc="Leaves the grid and moves to the next or previous focusable element on the page." />
+              </PropsTable>
+            </SubSection>
+
+            <SubSection title="Header & Group Navigation">
+              <PropsTable>
+                <PropRow prop="Header ArrowLeft / ArrowRight" type="key" def="-" desc="Moves between visible column headers." />
+                <PropRow prop="Header Home / End" type="key" def="-" desc="Moves to the first or last visible column header." />
+                <PropRow prop="Header Enter" type="key" def="sort" desc="Toggles sorting for the focused column header when sorting is enabled." />
+                <PropRow prop="Alt + ArrowLeft / ArrowRight" type="shortcut" def="resize" desc="Resizes the focused column using the same callback as mouse resize." />
+                <PropRow prop="Ctrl/Cmd + Shift + ArrowLeft / ArrowRight" type="shortcut" def="reorder" desc="Reorders the focused column using the same callback as drag reorder." />
+                <PropRow prop="Group row Enter" type="key" def="toggle" desc="Expands or collapses the focused row group." />
+                <PropRow prop="Group row ArrowRight / ArrowLeft" type="key" def="expand / collapse" desc="Expands collapsed row groups or collapses expanded row groups while preserving vertical navigation." />
               </PropsTable>
             </SubSection>
 
